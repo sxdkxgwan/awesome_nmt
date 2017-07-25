@@ -33,7 +33,7 @@ import os, sys
 if sys.version_info > (3, 0):
     from six.moves import xrange
 
-from bashlex import normalizer, data_tools
+from bashlint import normalizer, data_tools
 from nlp_tools import constants, ops, slot_filling, tokenizer
 
 # Special token symbols
@@ -780,11 +780,6 @@ def prepare_bash(FLAGS, verbose=False):
                     cm_tokens = data_tools.ast2tokens(
                         ast, with_parent=True, with_prefix=True)
                     cm_seq = data_tools.ast2list(ast, _list=[], with_parent=True)
-                    pruned_ast = normalizer.prune_ast(ast)
-                    cm_pruned_tokens = data_tools.ast2tokens(
-                        pruned_ast, loose_constraints=True, with_parent=True)
-                    cm_pruned_seq = data_tools.ast2list(
-                        pruned_ast, _list=[], with_parent=True)
                     nl_normalized_tokens, _ = tokenizer.ner_tokenizer(nl)
                     cm_normalized_tokens = data_tools.ast2tokens(
                         ast, arg_type_only=True, keep_common_args=False,
@@ -814,8 +809,6 @@ def prepare_bash(FLAGS, verbose=False):
                     getattr(nl_token_list, split).append(nl_tokens)
                     getattr(cm_token_list, split).append(cm_tokens)
                     getattr(cm_seq_list, split).append(cm_seq)
-                    getattr(cm_pruned_token_list, split).append(cm_pruned_tokens)
-                    getattr(cm_pruned_seq_list, split).append(cm_pruned_seq)
                     getattr(nl_partial_token_list, split).append(nl_partial_tokens)
                     getattr(cm_partial_token_list, split).append(cm_partial_tokens)
                     getattr(nl_norm_token_list, split).append(nl_normalized_tokens)
@@ -851,7 +844,7 @@ def prepare_bash(FLAGS, verbose=False):
         nl_tokens_wsq = []                  # nl tokens with separated quotes
         cm_tokens_wsq = []                  # cm tokens with separated quotes
         for word in nl_tokens:
-            if constants.with_quotation(word):
+            if constants.with_quotes(word):
                 nl_tokens_wsq.append(word[0])
                 nl_tokens_wsq.append(word[1:-1])
                 nl_tokens_wsq.append(word[-1])
@@ -860,7 +853,7 @@ def prepare_bash(FLAGS, verbose=False):
         for token in cm_tokens:
             if token.startswith('__ARG__'):
                 token = token[len('__ARG__'):]
-            if len(token) > 2 and constants.with_quotation(token):
+            if len(token) > 2 and constants.with_quotes(token):
                 cm_tokens_wsq.append(token[0])
                 cm_tokens_wsq.append(token[1:-1])
                 cm_tokens_wsq.append(token[-1])
@@ -946,8 +939,6 @@ def prepare_bash(FLAGS, verbose=False):
     nl_token_list = DataSet()
     cm_token_list = DataSet()
     cm_seq_list = DataSet()
-    cm_pruned_token_list = DataSet()
-    cm_pruned_seq_list = DataSet()
     nl_partial_token_list = DataSet()
     cm_partial_token_list = DataSet()
     nl_norm_token_list = DataSet()
@@ -983,11 +974,9 @@ def prepare_bash(FLAGS, verbose=False):
     nl_token_norm_suffix = ".ids%d.nl.norm" % nl_vocab_size
     cm_token_norm_suffix = ".ids%d.cm.norm" % cm_vocab_size
     cm_token_norm_order_suffix = ".ids%d.cm.norm.ordered" % cm_vocab_size
-    cm_token_pruned_suffix = ".ids%d.cm.pruned" % cm_vocab_size
     cm_seq_suffix = ".seq%d.cm" % cm_vocab_size
     cm_seq_norm_suffix = ".seq%d.cm.norm" % cm_vocab_size
     cm_seq_norm_order_suffix = ".seq%d.cm.norm.ordered" % cm_vocab_size
-    cm_seq_pruned_suffix = ".seq%d.cm.pruned" % cm_vocab_size
 
     _ = prepare_dataset(nl_list, data_dir, nl_suffix, nl_vocab_size, None)
     _ = prepare_dataset(cm_list, data_dir, cm_suffix, cm_vocab_size, None)
@@ -1009,16 +998,13 @@ def prepare_bash(FLAGS, verbose=False):
         cm_token_norm_suffix, cm_vocab_size, cm_norm_vocab_path)
     max_cm_token_norm_order_len = prepare_dataset(cm_canonical_token_list, data_dir,
         cm_token_norm_order_suffix, cm_vocab_size, cm_norm_vocab_path)
-    max_cm_token_pruned_len = prepare_dataset(cm_pruned_token_list, data_dir,
-        cm_token_pruned_suffix, cm_vocab_size, cm_vocab_path)
     max_cm_seq_len = prepare_dataset(cm_seq_list, data_dir, cm_seq_suffix,
         cm_vocab_size, cm_ast_vocab_path)
     max_cm_seq_norm_len = prepare_dataset(cm_normalized_seq_list, data_dir,
         cm_seq_norm_suffix, cm_vocab_size, cm_ast_norm_vocab_path)
     max_cm_seq_norm_order_len = prepare_dataset(cm_canonical_seq_list, data_dir,
         cm_seq_norm_order_suffix, cm_vocab_size, cm_ast_norm_vocab_path)
-    max_cm_seq_pruned_len = prepare_dataset(cm_pruned_seq_list, data_dir,
-        cm_seq_pruned_suffix, cm_vocab_size, cm_ast_vocab_path)
+
     save_slot_argument_mappings(slot_argument_mappings, mapping_suffix='.mappings')
     
     print("maximum num chars in description = %d" % max_nl_char_len)
@@ -1040,8 +1026,6 @@ def prepare_bash(FLAGS, verbose=False):
           max_cm_token_norm_order_len)
     print("maximum num canonical AST search steps = %d" %
           max_cm_seq_norm_order_len)
-    print("maximum num tokens in pruned command = %d" % max_cm_token_pruned_len)
-    print("maximum num pruned AST search steps = %d" % max_cm_seq_pruned_len)
 
     # compute channel (character or other features) representations
     compute_channel_representations(
